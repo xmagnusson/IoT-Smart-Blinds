@@ -1,0 +1,31 @@
+# Arduino build files
+*.elf
+*.hex
+*.bin
+*.eep
+*.map
+*.obj
+*.a
+*.d
+*.cpp.o
+*.c.o
+*.ino.*
+*.log
+
+# Arduino IDE temporary folders
+/build-*
+/*.tmp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secret configuration files
+Secrets.h
+config.h
+
+# VSCode / PlatformIO
+.vscode/
+.env
+platformio.ini
