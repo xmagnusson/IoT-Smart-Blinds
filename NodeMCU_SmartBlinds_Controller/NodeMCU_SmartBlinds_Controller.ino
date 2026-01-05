@@ -40,7 +40,7 @@ const unsigned long idleDetachTime = 1000; // miliseconds
 // Movement step
 const unsigned long moveInterval = 40; // ms between steps
 
-// constrains for servo movement
+// Constraints for servo movement
 const uint8_t SERVO_MIN = 0;
 const uint8_t SERVO_MAX = 180;
 
@@ -52,6 +52,14 @@ enum DeviceState {
 };
 
 DeviceState deviceState = STATE_INIT;
+
+// Control modes
+enum ControlMode {
+  MODE_AUTO,
+  MODE_MANUAL
+};
+
+ControlMode controlMode = MODE_AUTO;
 
 
 void setup() {
@@ -108,6 +116,9 @@ void readSensors(unsigned long now){
 void checkGlareProtection(uint16_t lightLevel){
   static bool glareActive = false;
   static uint8_t lastTargetPos_S1 = TILT_OPEN;
+
+  if(controlMode != MODE_AUTO) return;  // ignores glare protection in manual mode
+
 
   if (!glareActive && lightLevel > GLARE_THRESHOLD + GLARE_HYSTERESIS) {
     glareActive = true;
@@ -218,4 +229,26 @@ void handleMovingState(unsigned long now) {
     deviceState = STATE_IDLE;
     Serial.println("[STATE] MOVING → IDLE");
   }
+}
+
+
+// Control Modes Logic
+void setControlMode(ControlMode mode) {
+  if (controlMode == mode) return;
+
+  controlMode = mode;
+
+  Serial.print("[MODE] ");
+  Serial.println(mode == MODE_AUTO ? "AUTO" : "MANUAL");
+}
+
+void setTargetPosManually(uint8_t position) {
+  if (controlMode != MODE_MANUAL) return;
+
+  position = constrain(position, SERVO_MIN, SERVO_MAX);
+
+  blinds1.targetPos = position;
+
+  Serial.print("[MANUAL] blinds1.targetPos=");
+  Serial.println(position);
 }
