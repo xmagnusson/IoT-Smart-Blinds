@@ -3,7 +3,9 @@ package org.xmagnusson.iot.smart.blinds.mqtt;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHandler;
+import org.springframework.stereotype.Component;
 
+@Component
 public class MqttSubscriber implements MessageHandler {
 
     @Override
