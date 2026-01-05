@@ -1,10 +1,12 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 #include <Servo.h>
+#include "Secrets.h" // create a file Secrets.h (see Example__Secrets.h)
+#include <ArduinoJson.h>
 
 
 const int LDR_SENSOR_PIN = A0; // NodeMCU analog input A0 (0-3.3V with internal voltage divider, scaled to 0-1023) , raw ESP8266 chip only accepts 0-1V on A0 !!!
 const uint8_t SERVO_PIN_BLINDS_1 = D5; // GPIO14 (D5) on NodeMCU
-
-Servo servoBlinds1;
 
 const unsigned long LDR_SENSOR_INTERVAL = 500;
 const float LDR_IIR_FILTER_ALPHA = 0.15f;
@@ -24,6 +26,9 @@ struct ServoControl {
 
 // LDR-Sensor (PhotoResistor)
 uint16_t filtered_lightLevel_int;
+
+// Servo
+Servo servoBlinds1;
 
 // Servo states
 ServoControl blinds1 = {
@@ -61,16 +66,44 @@ enum ControlMode {
 
 ControlMode controlMode = MODE_AUTO;
 
+// Wifi
+WiFiClient espClient;
+
+bool wifiConnected = false;
+unsigned long lastWifiTry = 0;
+const unsigned long WIFI_RETRY_INTERVAL = 5000; // in ms
+
+// MQTT
+PubSubClient mqttClient(espClient);
+
+bool mqttConnected = false;
+unsigned long lastMqttTry = 0;
+const unsigned long MQTT_RETRY_INTERVAL = 20000; // in ms
+
+const char* DEVICE_ID = "B1";
+
+// MQTT Topics
+const char* TOPIC_CMD_MODE = "home/bedroom/blinds/B1/cmd/mode";
+const char* TOPIC_CMD_POSITION = "home/bedroom/blinds/B1/cmd/position";
+
+const char* TOPIC_STATE = "home/bedroom/blinds/B1/state";
+const char* TOPIC_AVAILABILITY = "home/bedroom/blinds/B1/availability";
+
 
 void setup() {
   Serial.begin(115200);
 
   pinMode(LDR_SENSOR_PIN, INPUT);
+
+  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setCallback(mqttCallback);
 }
 
 void loop() {
   unsigned long now = millis();
 
+  handleWifi(now);
+  handleMQTT(now);
   readSensors(now);
   updateStateMachine(now);
 }
@@ -81,6 +114,7 @@ void updateStateMachine(unsigned long now) {
 
   if (deviceState != lastState) {
     onStateEnter(deviceState);
+    publishState();
     lastState = deviceState;
   }
 
@@ -251,4 +285,98 @@ void setTargetPosManually(uint8_t position) {
 
   Serial.print("[MANUAL] blinds1.targetPos=");
   Serial.println(position);
+}
+
+
+// Wifi handler
+void handleWifi(unsigned long now) {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiConnected) {
+      wifiConnected = true;
+      Serial.println("[WIFI] Connected");
+      Serial.print("[WIFI] IP: ");
+      Serial.println(WiFi.localIP());
+    }
+    return;
+  }
+
+  wifiConnected = false;
+
+  // retry connection periodically
+  if (now - lastWifiTry > WIFI_RETRY_INTERVAL) {
+    lastWifiTry = now;
+    Serial.print("[WIFI] Connecting...");
+    Serial.println(WiFi.status());
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  }
+}
+
+// MQTT handler
+void handleMQTT(unsigned long now) {
+  if (!wifiConnected) return; // only try MQTT if connected to Wifi
+
+  // Detect disconnect
+  if (!mqttClient.connected()) {
+    mqttConnected = false;
+  }
+
+  if (!mqttConnected) {
+    if (now - lastMqttTry > MQTT_RETRY_INTERVAL) {
+      lastMqttTry = now;
+      Serial.println("[MQTT] Connecting...");
+
+      if (mqttClient.connect(DEVICE_ID, MQTT_USERNAME, MQTT_PASSWORD, TOPIC_AVAILABILITY, 1, true, "offline")) {  // id, username, password, LWT Topic, QoS, retain, Last Will and Testament
+        mqttConnected = true;
+        Serial.println("[MQTT] connected");
+        mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
+        mqttClient.subscribe(TOPIC_CMD_MODE);
+        mqttClient.subscribe(TOPIC_CMD_POSITION);
+      }
+    }
+  }
+
+  if (mqttConnected) {
+    mqttClient.loop();
+  }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  payload[length] = '\0'; // terminate raw message with '\0' before turning to C string
+  String msg = String((char*)payload);
+
+  Serial.print("[MQTT] ");
+  Serial.print(topic);
+  Serial.print(" → ");
+  Serial.println(msg);
+
+  // ----- MODE COMMAND -----
+  if (strcmp(topic, TOPIC_CMD_MODE) == 0) {
+    if (msg == "AUTO") {
+      setControlMode(MODE_AUTO);
+    } else if (msg == "MANUAL") {
+      setControlMode(MODE_MANUAL);
+    }
+  }
+
+  // ----- MANUAL POSITION COMMAND -----
+  else if (strcmp(topic, TOPIC_CMD_POSITION) == 0) {
+    setTargetPosManually(msg.toInt());
+  }
+}
+
+void publishState() {
+  StaticJsonDocument<256> doc;
+
+  doc["mode"] = (controlMode == MODE_AUTO) ? "AUTO" : "MANUAL";
+  doc["state"] = (deviceState == STATE_INIT)   ? "INIT" : (deviceState == STATE_IDLE)   ? "IDLE" : "MOVING";
+  doc["currentPos"] = blinds1.currentPos;
+  doc["targetPos"]  = blinds1.targetPos;
+  doc["attached"]   = blinds1.isAttached;
+  doc["light"]      = filtered_lightLevel_int;
+
+  char payload[256];
+  serializeJson(doc, payload);
+
+  mqttClient.publish(TOPIC_STATE, payload, true);
 }
