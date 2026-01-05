@@ -14,44 +14,83 @@ const uint16_t GLARE_HYSTERESIS = 50;
 const uint8_t TILT_OPEN = 90;
 const uint8_t TILT_GLARE = 30;
 
+struct ServoControl {
+  uint8_t currentPos;
+  uint8_t targetPos;
+  bool isAttached;
+  unsigned long lastMoveTime;
+  unsigned long lastStepTime;
+};
+
 // LDR-Sensor (PhotoResistor)
 uint16_t filtered_lightLevel_int;
 
-// Servo state
-bool isServoBlinds1Attached = false;
-uint8_t currentPos = TILT_OPEN;
-uint8_t targetPos = TILT_OPEN;
+// Servo states
+ServoControl blinds1 = {
+  .currentPos = TILT_OPEN,
+  .targetPos = TILT_OPEN,
+  .isAttached = false,
+  .lastMoveTime = 0,
+  .lastStepTime = 0
+};
 
 // Timing
 const unsigned long idleDetachTime = 1000; // miliseconds
 
 // Movement step
-const unsigned long moveInterval = 10; // ms between steps
+const unsigned long moveInterval = 40; // ms between steps
 
 // constrains for servo movement
 const uint8_t SERVO_MIN = 0;
 const uint8_t SERVO_MAX = 180;
+
+// Finite State Machine - States
+enum DeviceState {
+  STATE_INIT,
+  STATE_IDLE,
+  STATE_MOVING
+};
+
+DeviceState deviceState = STATE_INIT;
 
 
 void setup() {
   Serial.begin(115200);
 
   pinMode(LDR_SENSOR_PIN, INPUT);
-
-  // Servo 1 Init
-  servoBlinds1.attach(SERVO_PIN_BLINDS_1); 
-  isServoBlinds1Attached = true;
-  servoBlinds1.write(TILT_OPEN);
 }
 
 void loop() {
   unsigned long now = millis();
 
   readSensors(now);
-  checkGlareProtection(filtered_lightLevel_int);
-  moveBlinds(now);
+  updateStateMachine(now);
 }
 
+
+void updateStateMachine(unsigned long now) {
+  static DeviceState lastState = STATE_INIT;
+
+  if (deviceState != lastState) {
+    onStateEnter(deviceState);
+    lastState = deviceState;
+  }
+
+  switch (deviceState) {
+    case STATE_INIT:
+      handleInitState();
+      break;
+
+    case STATE_IDLE:
+      handleIdleState(now);
+      break;
+
+    case STATE_MOVING:
+      handleMovingState(now);
+      break;
+
+  }
+}
 
 void readSensors(unsigned long now){
   static unsigned long lastRead_LDR_Sensor = 0;
@@ -68,7 +107,7 @@ void readSensors(unsigned long now){
 
 void checkGlareProtection(uint16_t lightLevel){
   static bool glareActive = false;
-  static uint8_t lastTargetPos = TILT_OPEN;
+  static uint8_t lastTargetPos_S1 = TILT_OPEN;
 
   if (!glareActive && lightLevel > GLARE_THRESHOLD + GLARE_HYSTERESIS) {
     glareActive = true;
@@ -77,47 +116,106 @@ void checkGlareProtection(uint16_t lightLevel){
     glareActive = false;
   }
 
-  targetPos = glareActive ? TILT_GLARE : TILT_OPEN;
+  blinds1.targetPos = glareActive ? TILT_GLARE : TILT_OPEN;
 
   // for testing the servo command in a console
-  if(targetPos != lastTargetPos){ // event-based logging
+  if(blinds1.targetPos != lastTargetPos_S1){ // event-based logging
 
     Serial.print("[GLARE] state=");
     Serial.print(glareActive ? "ON" : "OFF");
-    Serial.print(" targetPos=");
-    Serial.println(targetPos);
+    Serial.print(" blinds1.targetPos=");
+    Serial.println(blinds1.targetPos);
 
-    lastTargetPos = targetPos;
+    lastTargetPos_S1 = blinds1.targetPos;
   }
 }
 
 // Function to move blinds slowly to a desired target position
 void moveBlinds(unsigned long now){ 
-  static unsigned long lastStepTime_servoBlinds1 = 0;
-  static unsigned long lastMoveTime_servoBlinds1 = 0;
-
+  
   // Servo controling Blinds 1
-  if (currentPos != targetPos && now - lastStepTime_servoBlinds1 >= moveInterval) {
+  if (blinds1.currentPos != blinds1.targetPos && now - blinds1.lastStepTime >= moveInterval) {
+    blinds1.lastStepTime = now;
 
-    lastStepTime_servoBlinds1 = now;
-
-    if (!isServoBlinds1Attached) {
+    if (!blinds1.isAttached) {
       servoBlinds1.attach(SERVO_PIN_BLINDS_1); 
-      isServoBlinds1Attached = true;
+      blinds1.isAttached = true;
     }
 
     // Step toward target
-    if (currentPos < targetPos) currentPos += 1;
-    if (currentPos > targetPos) currentPos -= 1;
+    if (blinds1.currentPos < blinds1.targetPos) blinds1.currentPos += 1;
+    if (blinds1.currentPos > blinds1.targetPos) blinds1.currentPos -= 1;
 
-    servoBlinds1.write(currentPos);
-    lastMoveTime_servoBlinds1 = now; // reset idle timer
+    servoBlinds1.write(blinds1.currentPos);
+    blinds1.lastMoveTime = now; // reset idle timer
   }
 
+}
+
+void servoTimeoutDetach(unsigned long now){
+
+  // Servo controling Blinds 1
   // Detach if idle for > 1s (to stop servo from buzzing when stationary)
-  if (isServoBlinds1Attached && now - lastMoveTime_servoBlinds1 > idleDetachTime) {
+  if (blinds1.isAttached && now - blinds1.lastMoveTime > idleDetachTime) {
     servoBlinds1.detach();
-    isServoBlinds1Attached = false;
+    blinds1.isAttached = false;
   }
+}
 
+//State Machine State Handlers
+
+void onStateEnter(DeviceState state) {
+  switch (state) {
+    case STATE_INIT:
+      Serial.println("[ENTER] INIT");
+      break;
+    case STATE_IDLE:
+      Serial.println("[ENTER] IDLE");
+      break;
+    case STATE_MOVING:
+      Serial.println("[ENTER] MOVING");
+      break;
+  }
+}
+
+// INIT
+void handleInitState() {
+
+  // set a init servo position
+  servoBlinds1.attach(SERVO_PIN_BLINDS_1);
+  blinds1.isAttached = true;
+  servoBlinds1.write(TILT_OPEN);
+  blinds1.lastMoveTime = millis(); // not to detach servo immediatelly rather after a set interval
+
+  // Transition
+  deviceState = STATE_IDLE;
+
+  Serial.println("[STATE] INIT → IDLE");
+}
+
+// IDLE
+void handleIdleState(unsigned long now) {
+
+  checkGlareProtection(filtered_lightLevel_int);
+  
+  // Ensure servo is detached in idle after 1 second of inactivity
+  servoTimeoutDetach(now);
+
+  // Transition condition
+  if (blinds1.currentPos != blinds1.targetPos) {
+    deviceState = STATE_MOVING;
+    Serial.println("[STATE] IDLE → MOVING");
+  }
+}
+
+// MOVING
+void handleMovingState(unsigned long now) {
+
+  moveBlinds(now);
+
+  // Transition when done
+  if (blinds1.currentPos == blinds1.targetPos) {
+    deviceState = STATE_IDLE;
+    Serial.println("[STATE] MOVING → IDLE");
+  }
 }
