@@ -40,9 +40,9 @@
                             </div>
                             <div class="device-info">
                                 <div class="d-flex">
-                                    <div  class="flex-fill">Mode: <span>AUTO</span></div>
-                                    <div  class="flex-fill">State: <span>RUNNING</span></div>
-                                    <div  class="flex-fill">Tilt: <span>90</span>&nbspdeg</div>
+                                    <div class="flex-fill">Mode: <span id="state-mode-B1"> - </span></div>
+                                    <div class="flex-fill">State: <span id="state-now-B1"> - </span></div>
+                                    <div class="flex-fill">Tilt: <span id="state-tilt-B1"> - </span>&nbspdeg</div>
                                 </div>
                             </div>
                         </div>
@@ -65,11 +65,17 @@
                     const data = JSON.parse(message.body);;
                     const status = data.availability;
 
-                    console.log(status);
-
                     document.getElementById("status-B1").textContent = (status === "online")? "connected":"disconnected";
                     document.getElementById("status-B1-dot").classList.remove((status === "online")? "offline":"online");
                     document.getElementById("status-B1-dot").classList.add((status === "online")? "online":"offline");
+                });
+
+                stompClient.subscribe('/home/bedroom/blinds/B1/state', function (message) {
+                    const data = JSON.parse(message.body);;
+
+                    document.getElementById("state-mode-B1").textContent = data.mode;
+                    document.getElementById("state-now-B1").textContent = data.state;
+                    document.getElementById("state-tilt-B1").textContent = data.currentPos;
                 });
             });
         </script>

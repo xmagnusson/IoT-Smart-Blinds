@@ -9,6 +9,7 @@ import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.xmagnusson.iot.smart.blinds.models.AvailabilityDTO;
+import org.xmagnusson.iot.smart.blinds.models.BlindsStateDTO;
 
 @Component
 public class MqttSubscriber implements MessageHandler {
@@ -45,6 +46,17 @@ public class MqttSubscriber implements MessageHandler {
                     status
                 );
             }
+
+            if (stateTopic.equals(topic)) {
+                BlindsStateDTO state = objectMapper.readValue(payload, BlindsStateDTO.class);
+
+                // send to frontend via websocket
+                messagingTemplate.convertAndSend(
+                        "/" + topic,
+                        state
+                );
+            }
+
 
         } catch (Exception e){
             e.printStackTrace();
