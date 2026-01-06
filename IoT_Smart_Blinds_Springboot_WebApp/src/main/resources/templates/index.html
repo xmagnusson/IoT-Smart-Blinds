@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title>Smart Blinds</title>
+        <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+    </head>
+    <body>
+        <h2>Smart Blinds</h2>
+
+        <div>
+            Status: <span id="status"></span>
+        </div>
+
+        <script>
+            const socket = new SockJS('/ws');
+            const stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, function () {
+                stompClient.subscribe('/home/bedroom/blinds/B1/availability', function (message) {
+                    const data = JSON.parse(message.body);;
+
+                    document.getElementById("status").textContent = data.availability.toUpperCase();
+                });
+            });
+        </script>
+    </body>
+</html>
