@@ -1,15 +1,59 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="IoT_dashboard" />
+        <meta name="author" content="xmagnusson" />
+
         <title>Smart Blinds</title>
+
+        <link rel="stylesheet" th:href="@{/styles/bootstrap.min.css}" type="text/css"/>
+        <link rel="stylesheet" th:href="@{/styles/dashboard.css}" type="text/css"/>
+
+        <!-- scripts for websocket -->
         <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
     </head>
     <body>
-        <h2>Smart Blinds</h2>
+        <nav class="navbar navbar-expand navbar-light fixed-top p-3 px-md-4">
+            <span class="navbar-brand prevent-select"> Smart Blinds </span>
+        </nav>
 
-        <div>
-            Status: <span id="status"></span>
+        <div class="d-flex flex-column justify-content-center align-items-center main">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12 col-lg-6">
+                        <div class="d-flex flex-column justify-content-center align-items-center my-3 device-container">
+                            <div class="flex-grow-1 w-100">
+                                <div class="d-flex justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <div class="device-path small">home/bedroom/blinds/</div>
+                                        <div class="device-name">B1</div>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center px-2">
+                                        <div id="status-B1-dot" class="status-dot offline"></div>
+                                        <div id="status-B1" class="small">disconnected</div>
+                                    </div>
+                                </div>
+                                <div class="p-2"></div>
+                            </div>
+                            <div class="device-info">
+                                <div class="d-flex">
+                                    <div  class="flex-fill">Mode: <span>AUTO</span></div>
+                                    <div  class="flex-fill">State: <span>RUNNING</span></div>
+                                    <div  class="flex-fill">Tilt: <span>90</span>&nbspdeg</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div class="d-flex justify-content-center align-items-center my-3 device-placeholder">
+                            device 2
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <script>
@@ -19,8 +63,13 @@
             stompClient.connect({}, function () {
                 stompClient.subscribe('/home/bedroom/blinds/B1/availability', function (message) {
                     const data = JSON.parse(message.body);;
+                    const status = data.availability;
 
-                    document.getElementById("status").textContent = data.availability.toUpperCase();
+                    console.log(status);
+
+                    document.getElementById("status-B1").textContent = (status === "online")? "connected":"disconnected";
+                    document.getElementById("status-B1-dot").classList.remove((status === "online")? "offline":"online");
+                    document.getElementById("status-B1-dot").classList.add((status === "online")? "online":"offline");
                 });
             });
         </script>
