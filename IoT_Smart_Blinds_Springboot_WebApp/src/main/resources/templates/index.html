@@ -17,7 +17,7 @@
     </head>
     <body>
         <nav class="navbar navbar-expand navbar-light fixed-top p-3 px-md-4">
-            <span class="navbar-brand prevent-select"> Smart Blinds </span>
+            <span class="navbar-brand prevent-select">Smart Blinds</span>
         </nav>
 
         <div class="d-flex flex-column justify-content-center align-items-center main">
@@ -36,7 +36,24 @@
                                         <div id="status-B1" class="small">disconnected</div>
                                     </div>
                                 </div>
-                                <div class="p-2"></div>
+                                <div class="d-flex flex-column p-5 align-items-center gap-5">
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <div class="prevent-select">Set Mode:</div>
+                                        <div id="set-mode-toggle" class="btn-group" role="group" aria-label="Basic radio toggle button group">
+                                            <input type="radio" class="btn-check" name="mode-B1" id="auto-B1" autocomplete="off" checked>
+                                            <label class="btn btn-outline-primary auto-button" for="auto-B1">AUTO</label>
+
+                                            <input type="radio" class="btn-check" name="mode-B1" id="manual-B1" autocomplete="off">
+                                            <label class="btn btn-outline-secondary manual-button" for="manual-B1">MANUAL</label>
+                                        </div>
+                                    </div>
+                                    <div id="manual-tilt-set" class="d-flex gap-2 align-items-center">
+                                        <div class="text-muted prevent-select">Set Tilt:</div>
+                                        <input disabled type="range" min="0" max="180" value="90" step="10" id="custom-tilt">
+                                        <div class="text-muted prevent-select"><span id="custom-tilt-value">90</span></div>
+                                        <button disabled id="set-tilt-button" type="button" class="btn btn-outline-secondary btn-sm manual-button">SET</button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="device-info">
                                 <div class="d-flex">
@@ -57,6 +74,10 @@
         </div>
 
         <script>
+            const autoButton = document.getElementById("auto-B1");
+            const manualButton = document.getElementById("manual-B1");
+
+            // websockets
             const socket = new SockJS('/ws');
             const stompClient = Stomp.over(socket);
 
@@ -76,8 +97,78 @@
                     document.getElementById("state-mode-B1").textContent = data.mode;
                     document.getElementById("state-now-B1").textContent = data.state;
                     document.getElementById("state-tilt-B1").textContent = data.currentPos;
+
+                    if(data.mode === "MANUAL"){
+                        document.querySelector(`label[for="${manualButton.id}"]`).textContent = "MANUAL";
+                        enableTiltSet();
+                        if (!manualButton.checked) manualButton.checked = true;
+                    }
+                    if(data.mode === "AUTO"){
+                        document.querySelector(`label[for="${autoButton.id}"]`).textContent = "AUTO";
+                        if (!autoButton.checked) autoButton.checked = true;
+                    }
                 });
             });
+
+            // send commands
+            function sendCommand(deviceId, command, value) {
+                fetch(`/api/blinds/${deviceId}/${command}?${command}=${value}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                })
+                .then(response => {
+                    if (response.ok) return response.text();
+                    throw new Error("Network response was not OK");
+                })
+                .catch(error => {
+                    console.error("Error sending command:", error);
+                });
+            }
+
+            // update tilt value in the UI based on the slider
+            const tiltSlider = document.getElementById("custom-tilt");
+
+            tiltSlider.addEventListener("input", () => {
+                const value = Number(tiltSlider.value);
+                document.getElementById("custom-tilt-value").textContent = value;
+            });
+
+            // sending tilt value
+            document.getElementById("set-tilt-button").addEventListener("click", () => {
+                sendCommand("B1","position", tiltSlider.value);
+            });
+
+            // enable setting the tilt based on mode
+            autoButton.addEventListener("change", () => {
+                if (autoButton.checked) {
+                  disableTiltSet();
+                  document.querySelector(`label[for="${autoButton.id}"]`).textContent = "Loading ...";
+                  sendCommand("B1","mode","AUTO");
+                  document.querySelector(`label[for="${manualButton.id}"]`).textContent = "MANUAL";
+                }
+            });
+
+            manualButton.addEventListener("change", () => {
+                if (manualButton.checked) {
+                  document.querySelector(`label[for="${manualButton.id}"]`).textContent = "Loading ...";
+                  sendCommand("B1","mode","MANUAL");
+                  document.querySelector(`label[for="${autoButton.id}"]`).textContent = "AUTO";
+                }
+            });
+
+            function disableTiltSet(){
+                document.querySelectorAll("#manual-tilt-set div").forEach(e => e.classList.add("text-muted"));
+                document.getElementById("custom-tilt").disabled = true;
+                document.querySelector("#manual-tilt-set button").disabled = true;
+            }
+
+            function enableTiltSet(){
+                document.querySelectorAll("#manual-tilt-set div").forEach(e => e.classList.remove("text-muted"));
+                document.getElementById("custom-tilt").disabled = false;
+                document.querySelector("#manual-tilt-set button").disabled = false;
+            }
         </script>
     </body>
 </html>

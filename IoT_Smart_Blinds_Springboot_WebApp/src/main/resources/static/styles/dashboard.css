@@ -67,3 +67,102 @@ body{
   padding: 3px 16px;
   clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
 }
+
+.auto-button{
+  background-color: white!important;
+  color: #104481!important;
+  border-color: #104481!important;
+}
+
+.auto-button:hover{
+  background-color: #104481!important;
+  color: white!important;
+  border-color: white!important;
+}
+
+#auto-B1:checked + .auto-button{
+  background-color: #104481!important;
+  color: white!important;
+}
+
+.manual-button{
+  background-color: white!important;
+  color: #1e1f1f !important;
+  border-color: #1e1f1f!important;
+}
+
+.manual-button:hover{
+  background-color: #1e1f1f!important;
+  color: white !important;
+}
+
+#manual-B1:checked + .manual-button{
+  background-color: #1e1f1f!important;
+  color: white !important;
+}
+
+/* Active button styling - disable checked button*/
+.btn-check:checked + .btn {
+    pointer-events: none;  /* disable mouse click */
+    cursor: default;
+}
+
+#custom-tilt-value{
+  width: 25px;
+  display: inline-block;
+  text-align: right;
+}
+
+/* SLIDER STYLES */
+#custom-tilt {
+  -webkit-appearance: none;  /* Override default CSS styles */
+  appearance: none;
+  height: 10px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.8;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+  border-radius: 5px;
+}
+
+#custom-tilt:hover {
+  opacity: 1;
+}
+
+/* -webkit- (Chrome, Opera, Safari, Edge) */
+#custom-tilt::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 20px;
+  background: #1e1f1f;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+#custom-tilt[type=range]:disabled::-webkit-slider-thumb {
+  cursor: default;
+}
+
+/* -moz- (Firefox) */
+#custom-tilt::-moz-range-thumb {
+  width: 8px;
+  height: 20px;
+  background: #1e1f1f;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+#custom-tilt[type=range]:disabled::-moz-range-thumb {
+  cursor: default;
+}
+
+#custom-tilt[type=range]:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#set-mode-toggle label{
+  width: 100px;
+}
