@@ -363,6 +363,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   else if (strcmp(topic, TOPIC_CMD_POSITION) == 0) {
     setTargetPosManually(msg.toInt());
   }
+  
+  publishState(); //report back new state
 }
 
 void publishState() {
