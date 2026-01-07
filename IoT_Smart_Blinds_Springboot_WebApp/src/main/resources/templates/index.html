@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="IoT_dashboard" />
+        <meta name="author" content="xmagnusson" />
+
+        <title>Smart Blinds</title>
+
+        <link rel="stylesheet" th:href="@{/styles/bootstrap.min.css}" type="text/css"/>
+        <link rel="stylesheet" th:href="@{/styles/dashboard.css}" type="text/css"/>
+
+        <!-- scripts for websocket -->
+        <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand navbar-light fixed-top p-3 px-md-4">
+            <span class="navbar-brand prevent-select">Smart Blinds</span>
+        </nav>
+
+        <div class="d-flex flex-column justify-content-center align-items-center main">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12 col-lg-6">
+                        <div class="d-flex flex-column justify-content-center align-items-center my-3 device-container">
+                            <div class="flex-grow-1 w-100">
+                                <div class="d-flex justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <div class="device-path small">home/bedroom/blinds/</div>
+                                        <div class="device-name">B1</div>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center px-2">
+                                        <div id="status-B1-dot" class="status-dot offline"></div>
+                                        <div id="status-B1" class="small">disconnected</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-column p-5 align-items-center gap-5">
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <div class="prevent-select">Set Mode:</div>
+                                        <div id="set-mode-toggle" class="btn-group" role="group" aria-label="Basic radio toggle button group">
+                                            <input type="radio" class="btn-check" name="mode-B1" id="auto-B1" autocomplete="off" checked>
+                                            <label class="btn btn-outline-primary auto-button" for="auto-B1">AUTO</label>
+
+                                            <input type="radio" class="btn-check" name="mode-B1" id="manual-B1" autocomplete="off">
+                                            <label class="btn btn-outline-secondary manual-button" for="manual-B1">MANUAL</label>
+                                        </div>
+                                    </div>
+                                    <div id="manual-tilt-set" class="d-flex gap-2 align-items-center">
+                                        <div class="text-muted prevent-select">Set Tilt:</div>
+                                        <input disabled type="range" min="0" max="180" value="90" step="10" id="custom-tilt">
+                                        <div class="text-muted prevent-select"><span id="custom-tilt-value">90</span></div>
+                                        <button disabled id="set-tilt-button" type="button" class="btn btn-outline-secondary btn-sm manual-button">SET</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="device-info">
+                                <div class="d-flex">
+                                    <div class="flex-fill">Mode: <span id="state-mode-B1"> - </span></div>
+                                    <div class="flex-fill">State: <span id="state-now-B1"> - </span></div>
+                                    <div class="flex-fill">Tilt: <span id="state-tilt-B1"> - </span>&nbspdeg</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div class="d-flex justify-content-center align-items-center my-3 device-placeholder">
+                            device 2
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const autoButton = document.getElementById("auto-B1");
+            const manualButton = document.getElementById("manual-B1");
+
+            // websockets
+            const socket = new SockJS('/ws');
+            const stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, function () {
+                stompClient.subscribe('/home/bedroom/blinds/B1/availability', function (message) {
+                    const data = JSON.parse(message.body);;
+                    const status = data.availability;
+
+                    document.getElementById("status-B1").textContent = (status === "online")? "connected":"disconnected";
+                    document.getElementById("status-B1-dot").classList.remove((status === "online")? "offline":"online");
+                    document.getElementById("status-B1-dot").classList.add((status === "online")? "online":"offline");
+                });
+
+                stompClient.subscribe('/home/bedroom/blinds/B1/state', function (message) {
+                    const data = JSON.parse(message.body);;
+
+                    document.getElementById("state-mode-B1").textContent = data.mode;
+                    document.getElementById("state-now-B1").textContent = data.state;
+                    document.getElementById("state-tilt-B1").textContent = data.currentPos;
+
+                    if(data.mode === "MANUAL"){
+                        document.querySelector(`label[for="${manualButton.id}"]`).textContent = "MANUAL";
+                        enableTiltSet();
+                        if (!manualButton.checked) manualButton.checked = true;
+                    }
+                    if(data.mode === "AUTO"){
+                        document.querySelector(`label[for="${autoButton.id}"]`).textContent = "AUTO";
+                        if (!autoButton.checked) autoButton.checked = true;
+                    }
+                });
+            });
+
+            // send commands
+            function sendCommand(deviceId, command, value) {
+                fetch(`/api/blinds/${deviceId}/${command}?${command}=${value}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                })
+                .then(response => {
+                    if (response.ok) return response.text();
+                    throw new Error("Network response was not OK");
+                })
+                .catch(error => {
+                    console.error("Error sending command:", error);
+                });
+            }
+
+            // update tilt value in the UI based on the slider
+            const tiltSlider = document.getElementById("custom-tilt");
+
+            tiltSlider.addEventListener("input", () => {
+                const value = Number(tiltSlider.value);
+                document.getElementById("custom-tilt-value").textContent = value;
+            });
+
+            // sending tilt value
+            document.getElementById("set-tilt-button").addEventListener("click", () => {
+                sendCommand("B1","position", tiltSlider.value);
+            });
+
+            // enable setting the tilt based on mode
+            autoButton.addEventListener("change", () => {
+                if (autoButton.checked) {
+                  disableTiltSet();
+                  document.querySelector(`label[for="${autoButton.id}"]`).textContent = "Loading ...";
+                  sendCommand("B1","mode","AUTO");
+                  document.querySelector(`label[for="${manualButton.id}"]`).textContent = "MANUAL";
+                }
+            });
+
+            manualButton.addEventListener("change", () => {
+                if (manualButton.checked) {
+                  document.querySelector(`label[for="${manualButton.id}"]`).textContent = "Loading ...";
+                  sendCommand("B1","mode","MANUAL");
+                  document.querySelector(`label[for="${autoButton.id}"]`).textContent = "AUTO";
+                }
+            });
+
+            function disableTiltSet(){
+                document.querySelectorAll("#manual-tilt-set div").forEach(e => e.classList.add("text-muted"));
+                document.getElementById("custom-tilt").disabled = true;
+                document.querySelector("#manual-tilt-set button").disabled = true;
+            }
+
+            function enableTiltSet(){
+                document.querySelectorAll("#manual-tilt-set div").forEach(e => e.classList.remove("text-muted"));
+                document.getElementById("custom-tilt").disabled = false;
+                document.querySelector("#manual-tilt-set button").disabled = false;
+            }
+        </script>
+    </body>
+</html>

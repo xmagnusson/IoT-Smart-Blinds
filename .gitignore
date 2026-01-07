@@ -1,3 +1,5 @@
+# ARDUINO
+
 # Arduino build files
 *.elf
 *.hex
@@ -29,3 +31,41 @@ config.h
 .vscode/
 .env
 platformio.ini
+
+#
+#
+#
+
+# SPRINGBOOT - JAVA
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+mvnw
+mvnw.cmd
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### Environment Files ###
+.env
+*.env
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
+
+# Logs folder
+logs/
+log/
