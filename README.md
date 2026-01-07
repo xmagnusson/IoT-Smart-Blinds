@@ -9,6 +9,31 @@ with real-time UI updates via WebSockets.
 
 (to be added)
 
+## Architecture Overview
+
+#### The system has 4 main parts:
+- ESP8266 edge device (controls the blinds, glare protection logic - AUTO mode)
+- Mosquitto (MQTT Broker)
+- Spring Boot backend (Web application logic)
+- Web UI (User interface in the browser - WebSockets for live data)
+
+#### Communication protocols:
+-	MQTT (edge device (ESP8266) ↔ MQTT Broker ↔ Spring Boot backend)
+-	REST (UI → Spring Boot backend)
+-	WebSocket (Spring Boot backend → UI)
+
+(All components communicate over a local Wi-Fi network using TCP/IP.)
+
+<br/>
+<div align="center">
+  <img src="doc/diagrams/Architecture.png" alt="Architecture diagram" width="800">
+  <div>System architecture diagram</div>
+</div>
+<br/>
+
+
+The architecture is scalable. It is possible to add more devices without big changes. The devices and UI are not tightly coupled because they communicate through a MQTT broker making the design more robust. Live updating of the UI thanks to websockers ensures good UX and professional design.
+
 ## Screenshots 
 
 ### Web Application - UI
@@ -33,30 +58,37 @@ with real-time UI updates via WebSockets.
 <br/>
 As mentioned this is just a PoC at the moment and is not yet controlling real blinds. However the PoC works and in the future for controlling real blinds a stronger servo motor (or potentially a stepper motor) could be used.
 
+## Wiring diagram
+<div align="center">
+  <img src="doc/diagrams/Edge_device_wiring_diagram.png" alt="Smart Blinds Edge Device wiring diagram" width="600">
+  <div>Smart Blinds Edge Device - current wiring diagram.</div>
+</div>
+
 ## Technologies
 
-### Backend
+#### Backend
 - Java 21
 - Spring Boot
 - Spring Integration MQTT
 - WebSockets (STOMP)
 - Jackson (JSON processing)
 
-### Edge Device
+#### Edge Device
 - ESP8266
 - Arduino framework
 - Servo motor
 - Light sensor
 
-### Communication
+#### Communication
 - MQTT (Mosquitto)
 
-### Infrastructure
-- Docker (running Mosquitto and later can run also the Springboot app)
+#### Infrastructure
+- Docker (running Mosquitto and later can run also the Spring Boot app)
 
-### Frontend
+#### Frontend
 - HTML / CSS / JavaScript
 - Bootstrap
+- Thymeleaf
 
 
 ## MQTT Topic Structure
@@ -71,4 +103,4 @@ home/bedroom/blinds/{deviceId}/cmd/position
 ```
 
 ## Plans for the next version
-- **Scheduled automation** - using Springboot Task Schedular the backend will be able to automatically close the blinds according to user set schedule. This could run everyday to close and open the blinds automatically or even based on the sunset and sunrise calculations
+- **Scheduled automation** - using Spring Boot Task Scheduler the backend will be able to automatically close the blinds according to user set schedule. This could run every day to close and open the blinds automatically or even based on the sunset and sunrise calculations
