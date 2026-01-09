@@ -330,6 +330,7 @@ void handleMQTT(unsigned long now) {
         mqttConnected = true;
         Serial.println("[MQTT] connected");
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
+        publishState();
         mqttClient.subscribe(TOPIC_CMD_MODE);
         mqttClient.subscribe(TOPIC_CMD_POSITION);
       }
