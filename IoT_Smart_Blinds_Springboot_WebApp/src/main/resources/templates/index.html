@@ -14,6 +14,8 @@
         <!-- scripts for websocket -->
         <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+        <!-- custom scripts -->
+        <script th:src="@{/scripts/loadInitialStatesAndWebSockets.js}"></script>
     </head>
     <body>
         <nav class="navbar navbar-expand navbar-light fixed-top p-3 px-md-4">
@@ -23,7 +25,7 @@
         <div class="d-flex flex-column justify-content-center align-items-center main">
             <div class="container">
                 <div class="row">
-                    <div class="col-12 col-lg-6">
+                    <div id="B1-device" class="col-12 col-lg-6">
                         <div class="d-flex flex-column justify-content-center align-items-center my-3 device-container">
                             <div class="flex-grow-1 w-100">
                                 <div class="d-flex justify-content-between">
@@ -74,59 +76,6 @@
         </div>
 
         <script>
-            const autoButton = document.getElementById("auto-B1");
-            const manualButton = document.getElementById("manual-B1");
-
-            // websockets
-            const socket = new SockJS('/ws');
-            const stompClient = Stomp.over(socket);
-
-            stompClient.connect({}, function () {
-                stompClient.subscribe('/home/bedroom/blinds/B1/availability', function (message) {
-                    const data = JSON.parse(message.body);;
-                    const status = data.availability;
-
-                    document.getElementById("status-B1").textContent = (status === "online")? "connected":"disconnected";
-                    document.getElementById("status-B1-dot").classList.remove((status === "online")? "offline":"online");
-                    document.getElementById("status-B1-dot").classList.add((status === "online")? "online":"offline");
-                });
-
-                stompClient.subscribe('/home/bedroom/blinds/B1/state', function (message) {
-                    const data = JSON.parse(message.body);;
-
-                    document.getElementById("state-mode-B1").textContent = data.mode;
-                    document.getElementById("state-now-B1").textContent = data.state;
-                    document.getElementById("state-tilt-B1").textContent = data.currentPos;
-
-                    if(data.mode === "MANUAL"){
-                        document.querySelector(`label[for="${manualButton.id}"]`).textContent = "MANUAL";
-                        enableTiltSet();
-                        if (!manualButton.checked) manualButton.checked = true;
-                    }
-                    if(data.mode === "AUTO"){
-                        document.querySelector(`label[for="${autoButton.id}"]`).textContent = "AUTO";
-                        if (!autoButton.checked) autoButton.checked = true;
-                    }
-                });
-            });
-
-            // send commands
-            function sendCommand(deviceId, command, value) {
-                fetch(`/api/blinds/${deviceId}/${command}?${command}=${value}`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    }
-                })
-                .then(response => {
-                    if (response.ok) return response.text();
-                    throw new Error("Network response was not OK");
-                })
-                .catch(error => {
-                    console.error("Error sending command:", error);
-                });
-            }
-
             // update tilt value in the UI based on the slider
             const tiltSlider = document.getElementById("custom-tilt");
 
@@ -141,6 +90,9 @@
             });
 
             // enable setting the tilt based on mode
+            const autoButton = document.getElementById("auto-B1");
+            const manualButton = document.getElementById("manual-B1");
+
             autoButton.addEventListener("change", () => {
                 if (autoButton.checked) {
                   disableTiltSet();
@@ -157,18 +109,6 @@
                   document.querySelector(`label[for="${autoButton.id}"]`).textContent = "AUTO";
                 }
             });
-
-            function disableTiltSet(){
-                document.querySelectorAll("#manual-tilt-set div").forEach(e => e.classList.add("text-muted"));
-                document.getElementById("custom-tilt").disabled = true;
-                document.querySelector("#manual-tilt-set button").disabled = true;
-            }
-
-            function enableTiltSet(){
-                document.querySelectorAll("#manual-tilt-set div").forEach(e => e.classList.remove("text-muted"));
-                document.getElementById("custom-tilt").disabled = false;
-                document.querySelector("#manual-tilt-set button").disabled = false;
-            }
         </script>
     </body>
 </html>

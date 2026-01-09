@@ -102,7 +102,7 @@ body{
 }
 
 /* Active button styling - disable checked button*/
-.btn-check:checked + .btn {
+.btn-check:checked + .btn, .disable-mode-button +.btn {
     pointer-events: none;  /* disable mouse click */
     cursor: default;
 }
@@ -165,4 +165,8 @@ body{
 
 #set-mode-toggle label{
   width: 100px;
+}
+
+.opacity-offline {
+    opacity: 0.6;
 }

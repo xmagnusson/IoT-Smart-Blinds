@@ -10,6 +10,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.xmagnusson.iot.smart.blinds.models.AvailabilityDTO;
 import org.xmagnusson.iot.smart.blinds.models.BlindsStateDTO;
+import org.xmagnusson.iot.smart.blinds.services.BlindsStateCache;
 
 @Component
 public class MqttSubscriber implements MessageHandler {
@@ -26,6 +27,9 @@ public class MqttSubscriber implements MessageHandler {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+    @Autowired
+    private BlindsStateCache blindsStateCache;
+
     @Override
     public void handleMessage(Message<?> message) {
         try {
@@ -36,9 +40,13 @@ public class MqttSubscriber implements MessageHandler {
             System.out.println("[MQTT] Payload: " + payload);
             System.out.println("----------------------------------");
 
+            String deviceId = extractDeviceId(topic);
+
             if (availabilityTopic.equals(topic)) {
                 AvailabilityDTO status = new AvailabilityDTO();
                 status.setAvailability(payload);
+
+                blindsStateCache.updateAvailability(deviceId, status);
 
                 // send to frontend via websocket
                 messagingTemplate.convertAndSend(
@@ -49,6 +57,8 @@ public class MqttSubscriber implements MessageHandler {
 
             if (stateTopic.equals(topic)) {
                 BlindsStateDTO state = objectMapper.readValue(payload, BlindsStateDTO.class);
+
+                blindsStateCache.updateState(deviceId, state);
 
                 // send to frontend via websocket
                 messagingTemplate.convertAndSend(
@@ -61,5 +71,11 @@ public class MqttSubscriber implements MessageHandler {
         } catch (Exception e){
             e.printStackTrace();
         }
+
+
+    }
+
+    private String extractDeviceId(String topic) {  // topic structure like - home/bedroom/blinds/{deviceId}/state
+        return topic.split("/")[3];
     }
 }

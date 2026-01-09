@@ -4,6 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.xmagnusson.iot.smart.blinds.models.AvailabilityDTO;
+import org.xmagnusson.iot.smart.blinds.models.BlindsStateDTO;
+import org.xmagnusson.iot.smart.blinds.services.BlindsStateCache;
 import org.xmagnusson.iot.smart.blinds.services.MqttPublisher;
 
 @RestController
@@ -19,10 +22,15 @@ public class BlindsController {
     @Value("${mqtt.topic.cmd-position}")
     private String cmdPositionTopic;
 
+    @Autowired
+    private BlindsStateCache blindsStateCache;
+
+    // SEND COMMANDS
     @PostMapping("blinds/{deviceId}/mode")
     public ResponseEntity<String> setMode(@PathVariable String deviceId, @RequestParam String mode) {
         String topicWithDeviceId = cmdModeTopic.replace("DEVICE_ID", deviceId);
-        System.out.println("Edited topic: " + topicWithDeviceId);
+        //System.out.println("Edited topic: " + topicWithDeviceId);
+
         publisher.sendCommand(topicWithDeviceId, mode.toUpperCase());
         return ResponseEntity.ok("Mode command sent: " + mode);
     }
@@ -30,9 +38,22 @@ public class BlindsController {
     @PostMapping("blinds/{deviceId}/position")
     public ResponseEntity<String> setPosition(@PathVariable String deviceId, @RequestParam int position) {
         String topicWithDeviceId = cmdPositionTopic.replace("DEVICE_ID", deviceId);
-        System.out.println("Edited topic: " + topicWithDeviceId);
+        //System.out.println("Edited topic: " + topicWithDeviceId);
 
         publisher.sendCommand(topicWithDeviceId, String.valueOf(position));
         return ResponseEntity.ok("Position command sent: " + position);
     }
+
+    // GET CURRENT STATES
+    @GetMapping("{deviceId}/availability")
+    public AvailabilityDTO getAvailability(@PathVariable String deviceId) {
+        return blindsStateCache.getAvailability(deviceId);
+    }
+
+    @GetMapping("{deviceId}/state")
+    public BlindsStateDTO getState(@PathVariable String deviceId) {
+        return blindsStateCache.getState(deviceId);
+    }
+
+
 }
